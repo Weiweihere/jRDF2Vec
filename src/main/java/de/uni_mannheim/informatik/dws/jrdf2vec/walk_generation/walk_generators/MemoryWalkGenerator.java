@@ -10,6 +10,19 @@ import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Set;
+import java.util.HashSet;
+import org.apache.jena.ontology.OntModel;
+import org.apache.jena.rdf.model.Statement;
+import org.apache.jena.rdf.model.StmtIterator;
+import java.util.Random;
+import de.uni_mannheim.informatik.dws.jrdf2vec.util.Edge;
+
+
 
 /**
  * Memory based walk generator using the {@link TripleDataSetMemory} data structure.
@@ -63,6 +76,7 @@ public abstract class MemoryWalkGenerator implements IWalkGenerator,
      * Constructor
      */
     public MemoryWalkGenerator(){
+        data = new TripleDataSetMemory();
         typeProperties.addAll(Arrays.asList(DEFAULT_TYPE_PROPERTIES));
     }
 
@@ -222,6 +236,26 @@ public abstract class MemoryWalkGenerator implements IWalkGenerator,
         }
         return result;
     }
+
+    public void readTriplesFromOwlModel(OntModel ontModel) {
+        StmtIterator iterator = ontModel.listStatements();
+        while (iterator.hasNext()) {
+            Statement stmt = iterator.nextStatement();
+    
+            String subject = uriShortenerFunction.apply(stmt.getSubject().toString());
+            String predicate = uriShortenerFunction.apply(stmt.getPredicate().toString());
+            String object;
+    
+            if (stmt.getObject().isResource()) {
+                object = uriShortenerFunction.apply(stmt.getObject().toString());
+                data.addObjectTriple(subject, predicate, object);
+            } else if (isParseDatatypeProperties && stmt.getObject().isLiteral()) {
+                object = textProcessingFunction.apply(stmt.getObject().asLiteral().getString());
+                data.addDatatypeTriple(subject, predicate, object);
+            }
+        }
+    }
+    
 
     /**
      * Generates walks that are ready to be processed further (already concatenated, space-separated).
@@ -587,32 +621,91 @@ public abstract class MemoryWalkGenerator implements IWalkGenerator,
     @Override
     public List<String> generateRandomWalksForEntity(String entity, int numberOfWalks, int depth){
         List<String> result = new ArrayList<>();
-        int currentDepth;
-        String currentWalk;
+        // int currentDepth;
+        // String currentWalk;
         int currentWalkNumber = 0;
 
-        nextWalk:
         while (currentWalkNumber < numberOfWalks) {
             currentWalkNumber++;
-            String lastObject = entity;
-            currentWalk = entity;
-            currentDepth = 0;
-            while (currentDepth < depth) {
-                currentDepth++;
-                Triple po = getRandomTripleForSubjectWithoutTags(lastObject);
-                if(po != null){
-                    currentWalk += " " + uriShortenerFunction.apply(po.predicate) + " " + uriShortenerFunction.apply(po.object);
-                    lastObject = po.object;
-                } else {
-                    // The current walk cannot be continued -> add to list (if there is a walk of depth 1) and create next walk.
-                    if(currentWalk.length() != entity.length()) result.add(currentWalk);
-                    continue nextWalk;
-                }
+            List<String> walk = generateRandomWalk(entity, depth);
+            if (walk.size() > 1) {
+                result.add(String.join(" ", walk));
             }
-            result.add(currentWalk);
         }
         return result;
     }
+
+    protected List<String> generateRandomWalk(String startNode, int depth) {
+        List<String> walk = new ArrayList<>();
+        String currentNode = startNode;
+        walk.add(currentNode);
+    
+        for (int i = 0; i < depth; i++) {
+            List<Edge> outgoingEdges = getOutgoingEdges(currentNode);
+            if (outgoingEdges == null || outgoingEdges.isEmpty()) {
+                break;
+            }
+    
+            Edge selectedEdge = selectEdgeWeighted(outgoingEdges);
+            if (selectedEdge == null) {
+                break;
+            }
+    
+            // Add predicate and object to the walk
+            walk.add(selectedEdge.getPredicate());
+            walk.add(selectedEdge.getObject());
+    
+            currentNode = selectedEdge.getObject();
+        }
+    
+        return walk;
+    }
+    
+    private List<Edge> getOutgoingEdges(String node) {
+        List<Edge> edges = new ArrayList<>();
+        List<Triple> triples = data.getObjectTriplesInvolvingSubject(node);
+    
+        if (triples != null) {
+            for (Triple triple : triples) {
+                String predicate = triple.predicate;
+                String object = triple.object;
+                Edge edge = new Edge(node, predicate, object);
+                edges.add(edge);
+            }
+        }
+        return edges;
+    }
+
+    private Edge selectEdgeWeighted(List<Edge> edges) {
+        double totalWeight = 0.0;
+        List<Double> cumulativeWeights = new ArrayList<>();
+    
+        // Step 1: Calculate cumulative weights
+        for (Edge edge : edges) {
+            double weight = edgeWeightsMap.getOrDefault(edge, 1.0);
+            totalWeight += weight;
+            cumulativeWeights.add(totalWeight);
+        }
+    
+        if (totalWeight == 0.0) {
+            return null; // No edges with positive weight
+        }
+    
+        // Step 2: Generate a random number
+        Random random = new Random();
+        double rand = random.nextDouble() * totalWeight;
+    
+        // Step 3: Select edge based on random number
+        for (int i = 0; i < cumulativeWeights.size(); i++) {
+            if (rand <= cumulativeWeights.get(i)) {
+                return edges.get(i);
+            }
+        }
+    
+        return edges.get(edges.size() - 1); // Fallback in case of rounding errors
+    }
+    
+    
 
     /**
      * Faster version of {@link NtMemoryWalkGenerator#getRandomTripleForSubject(String)}.
@@ -687,4 +780,11 @@ public abstract class MemoryWalkGenerator implements IWalkGenerator,
     public Set<String> getTypeProperties() {
         return typeProperties;
     }
+
+    private Map<Edge, Double> edgeWeightsMap;
+    
+    public void setEdgeWeightsMap(Map<Edge, Double> edgeWeightsMap) {
+        this.edgeWeightsMap = edgeWeightsMap;
+    }
+
 }

@@ -1,5 +1,5 @@
 package de.uni_mannheim.informatik.dws.jrdf2vec;
-
+import de.uni_mannheim.informatik.dws.jrdf2vec.util.EdgeWeightReader;
 import de.uni_mannheim.informatik.dws.jrdf2vec.util.Util;
 import org.apache.jena.ontology.OntModel;
 import org.apache.jena.query.*;
@@ -10,9 +10,15 @@ import de.uni_mannheim.informatik.dws.jrdf2vec.training.Word2VecConfiguration;
 import de.uni_mannheim.informatik.dws.jrdf2vec.walk_generation.base.WalkGenerationMode;
 import de.uni_mannheim.informatik.dws.jrdf2vec.walk_generation.base.WalkGenerationManager;
 
+
+
 import java.io.File;
 import java.net.URI;
 import java.time.Instant;
+
+// import javax.management.Query;
+import org.apache.jena.query.Query;
+
 
 
 /**
@@ -25,6 +31,11 @@ public class RDF2Vec implements IRDF2Vec {
      * File with KG triples.
      */
     private URI knowledgeGraphUri;
+
+    /**
+     * File with edge weights.
+     */
+    private URI edgeWeightsFile;
 
     /**
      * Ont model reference in case that is already loaded. (not important for CLI but for API usage)
@@ -93,6 +104,9 @@ public class RDF2Vec implements IRDF2Vec {
      * This is, for example, required when using the <a href="https://github.com/mariaangelapellegrino/Evaluation-Framework">evaluation framework for KG embeddings</a>.
      */
     boolean isVectorTextFileGeneration = true;
+    
+    
+
 
     /**
      * Main constructor
@@ -100,12 +114,25 @@ public class RDF2Vec implements IRDF2Vec {
      * @param walkDirectory The walk directory that shall be generated.
      */
     public RDF2Vec(URI knowledgeGraphUri, File walkDirectory) {
-        this.knowledgeGraphUri = knowledgeGraphUri;
+        // this.knowledgeGraphUri = knowledgeGraphUri;
+        this(knowledgeGraphUri, walkDirectory, null);
+
         if(!isUriOk(knowledgeGraphUri)){
             LOGGER.error("There is a problem with the provided knowledge graph. RDF2Vec is not functional.");
         }
         setWalkDirectory(walkDirectory);
     }
+
+    public RDF2Vec(URI knowledgeGraphUri, File walkDirectory, URI edgeWeightsFile) {
+        this.knowledgeGraphUri = knowledgeGraphUri;
+        this.edgeWeightsFile = edgeWeightsFile;
+    
+        if (!isUriOk(knowledgeGraphUri)) {
+            LOGGER.error("There is a problem with the provided knowledge graph. RDF2Vec is not functional.");
+        }
+        setWalkDirectory(walkDirectory);
+    }
+    
 
     /**
      * Constructor
@@ -116,6 +143,13 @@ public class RDF2Vec implements IRDF2Vec {
     public RDF2Vec(File knowledgeGraphFile, File walkDirectory) {
         this(knowledgeGraphFile.toURI(), walkDirectory);
     }
+
+
+
+    // public RDF2Vec(URI knowledgeGraphUri, File walkDirectory) {
+        // this(knowledgeGraphUri, walkDirectory, null);
+    // }
+    
 
     /**
      * Constructor
@@ -397,5 +431,7 @@ public class RDF2Vec implements IRDF2Vec {
             return false;
         }
     }
+
+
 
 }

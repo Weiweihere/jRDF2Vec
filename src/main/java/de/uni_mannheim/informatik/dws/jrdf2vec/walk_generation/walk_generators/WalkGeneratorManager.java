@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
+import java.net.URI;
 
 import static de.uni_mannheim.informatik.dws.jrdf2vec.util.Util.readOntology;
 
@@ -31,7 +32,11 @@ public class WalkGeneratorManager {
      * @return Pair with parser and entity selector.
      */
     public static Pair<IWalkGenerator, EntitySelector> parseSingleFile(String tripleFile){
-        return parseSingleFile(new File(tripleFile), false);
+        return parseSingleFile(new File(tripleFile), false,null);
+    }
+
+    public static Pair<IWalkGenerator, EntitySelector> parseSingleFile(String tripleFile, boolean isParseDatatypeTriples) {
+        return parseSingleFile(new File(tripleFile), isParseDatatypeTriples, null);
     }
 
     /**
@@ -40,8 +45,8 @@ public class WalkGeneratorManager {
      * @param isParseDatatypeTriples True if datatype triples shall also be parsed.
      * @return Pair with parser and entity selector.
      */
-    public static Pair<IWalkGenerator, EntitySelector> parseSingleFile(String tripleFile, boolean isParseDatatypeTriples){
-        return parseSingleFile(new File(tripleFile), isParseDatatypeTriples);
+    public static Pair<IWalkGenerator, EntitySelector> parseSingleFile(String tripleFile, boolean isParseDatatypeTriples, URI edgeWeightsFile){
+        return parseSingleFile(new File(tripleFile), isParseDatatypeTriples, edgeWeightsFile);
     }
 
     /**
@@ -50,7 +55,7 @@ public class WalkGeneratorManager {
      * @param isParseDatatypeTriples True if datatype properties shall also be parsed.
      * @return Pair with parser and entity selector.
      */
-    public static Pair<IWalkGenerator, EntitySelector> parseSingleFile(File tripleFile, boolean isParseDatatypeTriples){
+    public static Pair<IWalkGenerator, EntitySelector> parseSingleFile(File tripleFile, boolean isParseDatatypeTriples, URI edgeWeightsFile){
         IWalkGenerator parser = null;
         EntitySelector entitySelector = null;
         try {
@@ -62,16 +67,16 @@ public class WalkGeneratorManager {
                 }
                 try {
                     LOGGER.info("Using NxParser.");
-                    parser = new NxMemoryWalkGenerator(pathToTripleFile, isParseDatatypeTriples);
+                    parser = new NxMemoryWalkGenerator(pathToTripleFile, isParseDatatypeTriples, edgeWeightsFile);
                     entitySelector = new MemoryEntitySelector(((NxMemoryWalkGenerator) parser).getData());
                 } catch (Exception e) {
                     LOGGER.error("There was a problem using the default NxParser. Retry with slower NtParser.");
-                    parser = new NtMemoryWalkGenerator(pathToTripleFile, isParseDatatypeTriples);
+                    parser = new NtMemoryWalkGenerator(pathToTripleFile, isParseDatatypeTriples, edgeWeightsFile);
                     entitySelector = new MemoryEntitySelector(((NtMemoryWalkGenerator) parser).getData());
                 }
                 if (((MemoryWalkGenerator) parser).getDataSize() == 0L) {
                     LOGGER.error("There was a problem using the default NxParser. Retry with slower NtParser.");
-                    parser = new NtMemoryWalkGenerator(pathToTripleFile, isParseDatatypeTriples);
+                    parser = new NtMemoryWalkGenerator(pathToTripleFile, isParseDatatypeTriples, edgeWeightsFile);
                     entitySelector = new MemoryEntitySelector(((NtMemoryWalkGenerator) parser).getData());
                 }
             } else if (fileName.toLowerCase().endsWith(".ttl")) {
@@ -79,14 +84,14 @@ public class WalkGeneratorManager {
                 entitySelector = new OntModelEntitySelector(model);
                 File newResourceFile = new File(tripleFile.getParent(), fileName.substring(0, fileName.length() - 3) + "nt");
                 NtMemoryWalkGenerator.saveAsNt(model, newResourceFile);
-                parser = new NtMemoryWalkGenerator(newResourceFile, isParseDatatypeTriples);
+                parser = new NtMemoryWalkGenerator(newResourceFile.getAbsolutePath(), isParseDatatypeTriples,edgeWeightsFile);
             } else if (fileName.toLowerCase().endsWith(".xml") || fileName.toLowerCase().endsWith(".rdf")) {
                 OntModel model = readOntology(pathToTripleFile, Lang.RDFXML);
                 entitySelector = new OntModelEntitySelector(model);
                 File newResourceFile = new File(tripleFile.getParent(), fileName.substring(0, fileName.length() - 3) + "nt");
                 //this.parser = new JenaOntModelMemoryParser(this.model, this);
                 NtMemoryWalkGenerator.saveAsNt(model, newResourceFile);
-                parser = new NtMemoryWalkGenerator(newResourceFile, isParseDatatypeTriples);
+                parser = new NtMemoryWalkGenerator(newResourceFile.getAbsolutePath(), isParseDatatypeTriples, edgeWeightsFile);
             } else if (fileName.toLowerCase().endsWith(".hdt") || fileName.toLowerCase().endsWith(".hdt.index.v1-1")) {
                 LOGGER.info("HDT file detected. Using HDT parser.");
                 try {

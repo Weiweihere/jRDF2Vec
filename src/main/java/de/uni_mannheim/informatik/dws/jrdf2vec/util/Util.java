@@ -27,9 +27,9 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPInputStream;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
-
+// import static org.junit.jupiter.api.Assertions.assertTrue;
+// import static org.junit.jupiter.api.Assertions.fail;
+// 
 /**
  * Static methods providing basic functionality to be used by multiple classes.
  */
@@ -295,7 +295,7 @@ public class Util {
             }
         } catch (IOException e) {
             e.printStackTrace();
-            fail("Could not read gzipped file.");
+            throw new RuntimeException("Could not read gzipped file.");
         }
 
         return result;
@@ -457,16 +457,17 @@ public class Util {
             File result;
             if (fileUrl != null) {
                 result = FileUtils.toFile(fileUrl.toURI().toURL());
-                assertTrue(result.exists(), "Required resource not available.");
+                if(!result.exists()) {
+                    throw new RuntimeException("Required resource not available.");
+                }
                 return result;
             } else {
-                fail("FileName URL is null.");
-                return null;
+                throw new RuntimeException("FileName URL is null.");
+                
             }
         } catch (URISyntaxException | MalformedURLException exception) {
             exception.printStackTrace();
-            fail("Could not load file.");
-            return null;
+            throw new RuntimeException("Could not load file.");
         }
     }
 

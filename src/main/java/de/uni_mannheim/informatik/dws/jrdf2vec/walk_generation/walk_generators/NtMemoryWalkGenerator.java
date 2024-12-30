@@ -5,9 +5,13 @@ import de.uni_mannheim.informatik.dws.jrdf2vec.walk_generation.base.ISearchCondi
 import org.apache.jena.ontology.OntModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import de.uni_mannheim.informatik.dws.jrdf2vec.walk_generation.data_structures.Triple;
+
 
 import java.io.*;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -16,13 +20,27 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
+import de.uni_mannheim.informatik.dws.jrdf2vec.util.EdgeWeightReader;
+import de.uni_mannheim.informatik.dws.jrdf2vec.util.Edge;
+import de.uni_mannheim.informatik.dws.jrdf2vec.util.UriUtils;
+import java.util.Map;
+import java.util.Random;
+
+
+
+
 
 /**
  * A parser for NT files. Mainly implemented to support {@link NtMemoryWalkGenerator#getRandomTripleForSubject(String)} in
  * an efficient way.
  */
-public class NtMemoryWalkGenerator extends MemoryWalkGenerator {
+public class NtMemoryWalkGenerator extends MemoryWalkGenerator implements IEdgeWeightedWalkGenerator {
 
+
+    /**
+    * Map to store edge weights.
+    */
+    private Map<Edge, Double> edgeWeightsMap;
 
     /**
      * Default logger
@@ -45,6 +63,16 @@ public class NtMemoryWalkGenerator extends MemoryWalkGenerator {
      */
     public NtMemoryWalkGenerator(){
         this(false);
+    }
+
+
+    @Override
+    public void loadEdgeWeights(String weightsFilePath) {
+        try {
+            edgeWeightsMap = EdgeWeightReader.readEdgeWeights(new File(weightsFilePath));
+        } catch (IOException e) {
+            LOGGER.error("Error loading edge weights from file: " + weightsFilePath, e);
+        }
     }
 
     /**
@@ -109,6 +137,19 @@ public class NtMemoryWalkGenerator extends MemoryWalkGenerator {
         this(tripleFile, false);
     }
 
+    @Override
+    public List<String> generateRandomWalksForEntity(String entity, int numberOfWalks, int depth) {
+        List<String> walks = new ArrayList<>();
+        for (int i = 0; i < numberOfWalks; i++) {
+            List<String> walk = generateRandomWalk(entity, depth);
+            if (!walk.isEmpty()) {
+                walks.add(String.join(" ", walk));
+            }
+        }
+        return walks;
+    }
+
+
     /**
      * Constructor
      *
@@ -118,6 +159,56 @@ public class NtMemoryWalkGenerator extends MemoryWalkGenerator {
     public NtMemoryWalkGenerator(File tripleFile, boolean isParseDatatypeTriples) {
         this(isParseDatatypeTriples);
         readNTriples(tripleFile, false);
+    }
+
+    public NtMemoryWalkGenerator(String pathToTripleFile, boolean isParseDatatypeTriples, URI edgeWeightsFile) {
+    this(pathToTripleFile, isParseDatatypeTriples);
+    if (edgeWeightsFile != null) {
+        loadEdgeWeights(edgeWeightsFile);
+    }}
+
+    public void loadEdgeWeights(URI edgeWeightsFile) {
+        try {
+            edgeWeightsMap = EdgeWeightReader.readEdgeWeights(new File(edgeWeightsFile));
+        } catch (IOException e) {
+            LOGGER.error("Error loading edge weights from file: " + edgeWeightsFile, e);
+        }
+    }
+    
+
+
+     /**
+     * Generates a single weighted random walk starting from the given entity.
+     *
+     * @param startNode The starting node of the walk.
+     * @param depth     The depth of the walk (number of hops).
+     * @return A list of nodes and predicates representing the walk.
+     */
+    @Override
+    protected List<String> generateRandomWalk(String startNode, int depth) {
+        List<String> walk = new ArrayList<>();
+        String currentNode = startNode;
+        walk.add(currentNode);
+        
+        for (int i = 0; i < depth; i++) {
+            List<Edge> outgoingEdges = getOutgoingEdges(currentNode);
+            if (outgoingEdges == null || outgoingEdges.isEmpty()) {
+                break;
+            }
+
+            Edge selectedEdge = selectEdgeWeighted(outgoingEdges);
+            if (selectedEdge == null) {
+                break;
+            }
+
+            // Add predicate and object to the walk
+            walk.add(selectedEdge.getPredicate());
+            walk.add(selectedEdge.getObject());
+
+            currentNode = selectedEdge.getObject();
+        }
+
+        return walk;
     }
 
     /**
@@ -489,4 +580,67 @@ public class NtMemoryWalkGenerator extends MemoryWalkGenerator {
         }
         super.isParseDatatypeProperties = includeDatatypeProperties;
     }
+
+    /**
+ * Retrieves the list of outgoing edges from the given node.
+ *
+ * @param node The node whose outgoing edges are to be retrieved.
+ * @return A list of Edge objects representing the outgoing edges.
+ */
+private List<Edge> getOutgoingEdges(String node) {
+    List<Edge> edges = new ArrayList<>();
+    // Map<String, Map<String, List<String>>> dataMap = data.getData();
+
+    String subject = UriUtils.processUri(node);
+    List<Triple> triples = data.getObjectTriplesInvolvingSubject(subject);
+
+    if (triples != null) {
+        for (Triple triple : triples) {
+            String predicate = UriUtils.processUri(triple.predicate);
+            String object = UriUtils.processUri(triple.object);
+            Edge edge = new Edge(subject, predicate, object);
+            edges.add(edge);
+        }
+    }
+    return edges;
+}
+
+
+/**
+ * Selects an edge from the list based on the edge weights.
+ *
+ * @param edges The list of edges to select from.
+ * @return The selected Edge.
+ */
+private Edge selectEdgeWeighted(List<Edge> edges) {
+    double totalWeight = 0.0;
+    List<Double> cumulativeWeights = new ArrayList<>();
+
+    // Step 1: Calculate cumulative weights
+    for (Edge edge : edges) {
+        double weight = edgeWeightsMap.getOrDefault(edge, 1.0);
+        totalWeight += weight;
+        cumulativeWeights.add(totalWeight);
+    }
+
+    if (totalWeight == 0.0) {
+        return null;
+    }
+
+     // Step 2: Generate a random number
+     // Fixed seed for reproducibility
+    Random random = new Random(42);
+    double rand = random.nextDouble() * totalWeight;
+
+     // Step 3: Select edge based on random number
+    for (int i = 0; i < cumulativeWeights.size(); i++) {
+        if (rand <= cumulativeWeights.get(i)) {
+            return edges.get(i);
+        }
+    }
+
+    return edges.get(edges.size() - 1); // Fallback
+}
+
+
 }

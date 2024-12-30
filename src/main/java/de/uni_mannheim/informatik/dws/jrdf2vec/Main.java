@@ -34,6 +34,8 @@ public class Main {
      * File to the knowledge graph
      */
     private static File knowledgeGraphFile = null;
+    private static File edgeWeighstFile = null;
+
 
     /**
      * The number of threads to be used for the walk generation and for the training.
@@ -317,6 +319,19 @@ public class Main {
                 return;
             }
         }
+
+        String edgeWeightsFilePath = getValue("-edgeWeights", args);
+        File edgeWeightsFile = null;
+        if (edgeWeightsFilePath != null) {
+            edgeWeightsFile = new File(edgeWeightsFilePath);
+            if (!edgeWeightsFile.exists()) {
+                System.out.println("The specified edge weights file does not exist: " + edgeWeightsFilePath);
+                return; // stop program execution
+                }
+            } else {
+                System.out.println("No edge weights file specified. Proceeding without edge weights.");
+            }
+
 
         String lightEntityFilePath = getValue("-light", args);
         if (lightEntityFilePath != null) {

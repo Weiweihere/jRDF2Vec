@@ -1,5 +1,6 @@
 package de.uni_mannheim.informatik.dws.jrdf2vec.walk_generation.walk_generators;
 
+import de.uni_mannheim.informatik.dws.jrdf2vec.util.Edge;
 import de.uni_mannheim.informatik.dws.jrdf2vec.walk_generation.data_structures.TripleDataSetMemory;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.LineIterator;
@@ -9,10 +10,21 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Random;
 import java.util.function.UnaryOperator;
+import de.uni_mannheim.informatik.dws.jrdf2vec.util.EdgeWeightReader;
+import de.uni_mannheim.informatik.dws.jrdf2vec.util.UriUtils;
+import java.util.Objects;
+// import org.somepackage.Triple;
+import de.uni_mannheim.informatik.dws.jrdf2vec.walk_generation.data_structures.Triple;
+
+
+
 
 
 /**
@@ -37,6 +49,9 @@ public class NxMemoryWalkGenerator extends MemoryWalkGenerator {
      * If the first X lines cannot be parsed, the parsing process will be cancelled.
      */
     private int linesToCheck = DEFAULT_CHECK_LINES;
+
+    private Map<Edge, Double> edgeWeightsMap;
+
 
     /**
      * Constructor
@@ -74,6 +89,85 @@ public class NxMemoryWalkGenerator extends MemoryWalkGenerator {
     public NxMemoryWalkGenerator(String nTripleFilePath, boolean isParseDatatypeTriples) {
         this(new File(nTripleFilePath), isParseDatatypeTriples);
     }
+
+    public NxMemoryWalkGenerator(String nTripleFilePath, boolean isParseDatatypeTriples, URI edgeWeightsFile) {
+        this(new File(nTripleFilePath), isParseDatatypeTriples);
+        if (edgeWeightsFile != null) {
+            loadEdgeWeights(edgeWeightsFile);
+        }}
+
+    
+    
+
+    private List<Edge> getOutgoingEdges(String node) {
+        List<Edge> edges = new ArrayList<>();
+    
+        String subject = UriUtils.processUri(node);
+        List<Triple> triples = data.getObjectTriplesInvolvingSubject(subject);
+    
+        if (triples != null) {
+            for (Triple triple : triples) {
+                String predicate = UriUtils.processUri(triple.predicate);
+                String object = UriUtils.processUri(triple.object);
+                Edge edge = new Edge(subject, predicate, object);
+                edges.add(edge);
+            }
+        }
+        return edges;
+    }
+    
+
+    // @Override
+    protected List<String> generateRandomWalk(String startNode, int depth) {
+        List<String> walk = new ArrayList<>();
+        String currentNode = startNode;
+        walk.add(currentNode);
+        
+        for (int i = 0; i < depth; i++) {
+            List<Edge> outgoingEdges = getOutgoingEdges(currentNode);
+            if (outgoingEdges == null || outgoingEdges.isEmpty()) {
+                break;
+            }
+            Edge selectedEdge = selectEdgeWeighted(outgoingEdges);
+            if (selectedEdge == null) {
+                break;
+            }
+            // Add predicate and object to the walk
+            walk.add(selectedEdge.getPredicate());
+            walk.add(selectedEdge.getObject());
+
+            currentNode = selectedEdge.getObject();
+        }
+        return walk;
+    }
+
+    private Edge selectEdgeWeighted(List<Edge> edges) {
+        double totalWeight = 0.0;
+        List<Double> cumulativeWeights = new ArrayList<>();
+        // Step 1: Calculate cumulative weights
+        
+        for (Edge edge : edges) {
+            double weight = edgeWeightsMap.getOrDefault(edge, 1.0);
+            totalWeight += weight;
+            cumulativeWeights.add(totalWeight);}
+            
+        if (totalWeight == 0.0) {
+            return null; // No edges with positive weight
+        }
+        // Step 2: Generate a random number
+        Random random = new Random(42);
+        double rand = random.nextDouble() * totalWeight;
+
+    // Step 3: Select edge based on random number
+     for (int i = 0; i < cumulativeWeights.size(); i++) {
+        if (rand <= cumulativeWeights.get(i)) {
+            return edges.get(i);
+        }
+    }
+    
+    return edges.get(edges.size() - 1); // Fallback in case of rounding errors
+    }
+
 
     /**
      * Constructor
@@ -155,6 +249,18 @@ public class NxMemoryWalkGenerator extends MemoryWalkGenerator {
             }
         }
     }
+
+    public void loadEdgeWeights(URI edgeWeightsFile) {
+        try {
+            edgeWeightsMap = EdgeWeightReader.readEdgeWeights(new File(edgeWeightsFile));
+        } catch (IOException e) {
+            LOGGER.error("Error loading edge weights from file: " + edgeWeightsFile, e);
+        }
+    }
+
+    // NtMemoryWalkGenerator walkGenerator = new NtMemoryWalkGenerator(pathToTripleFile, isParseDatatypeTriples);
+    // walkGenerator.loadEdgeWeights(edgeWeightsFile);
+
 
     /**
      * Check if the file can be parsed by only parsing the first few lines.
