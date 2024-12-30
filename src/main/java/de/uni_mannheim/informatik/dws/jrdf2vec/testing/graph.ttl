@@ -1,8 +1,0 @@
-<http://example.org/A> <http://example.org/knows> <http://example.org/B> .
-<http://example.org/A> <http://example.org/knows> <http://example.org/C> .
-<http://example.org/A> <http://example.org/knows> <http://example.org/D> .
-<http://example.org/B> <http://example.org/likes> <http://example.org/C> .
-<http://example.org/C> <http://example.org/likes> <http://example.org/D> .
-<http://example.org/B> <http://example.org/uses> <http://example.org/C> .
-<http://example.org/B> <http://example.org/uses> <http://example.org/D> .
-
