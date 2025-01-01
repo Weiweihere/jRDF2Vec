@@ -127,3 +127,23 @@ python_command.txt
 !src/test/resources/existing_walk_directory/walk_file.txt
 !src/test/resources/nt_directory_type_walks/*
 !src/test/resources/walk_merge/*
+src/main/java/de/uni_mannheim/informatik/dws/jrdf2vec/testing/
+# 忽略虚拟环境
+venv/
+.env
+*.pyc
+__pycache__/
+
+# 忽略测试输出和日志
+logs/
+*.log
+*.out
+tests/output/
+# 忽略 myenv 虚拟环境
+myenv/
+tests/results/
+
+# 忽略 IDE 配置文件
+.vscode/
+.idea/
+
