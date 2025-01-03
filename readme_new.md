@@ -8,10 +8,12 @@ This repository contains an enhanced version of RDF2Vec developed for our resear
 - **Enhanced Features:**  
   - Weighted walk generation  
   - Improved performance on large knowledge graphs  
-  - Added embedding generation using weighted walk files  
-
+  - Added embedding generation using weighted walk files
+- ** run
+module load devel/python/3.8.6_intel_19.1
+mvn -Dtest=TestWalkGenerationWithWeights test
 ## New Additions and Modifications
-### 1. Test Walk Generation with Weights
+### 1.  Walk Generation with Weights
 - **File:**  
   [`TestWalkGenerationWithWeights.java`](src/test/java/de/uni_mannheim/informatik/dws/jrdf2vec/util/TestWalkGenerationWithWeights.java)  
 - **Description:**  
@@ -21,5 +23,4 @@ This repository contains an enhanced version of RDF2Vec developed for our resear
 
 ### 2. Embedding Generation Command
 - **Command to Generate Embeddings from Walk Files:**  
-   ```bash
    mvn exec:java -Dexec.mainClass="de.uni_mannheim.informatik.dws.jrdf2vec.util.EmbeddingGenerator"
