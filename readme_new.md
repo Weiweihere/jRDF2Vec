@@ -6,8 +6,7 @@ This repository contains an enhanced version of RDF2Vec developed for our resear
 - **Branch:** `feature-updates`  
 - **Original Repository:** Forked from [dwslab/jRDF2Vec](https://github.com/dwslab/jRDF2Vec)  
 - **Enhanced Features:**  
-  - Weighted walk generation  
-  - Improved performance on large knowledge graphs  
+  - Weighted walk generation   
   - Added embedding generation using weighted walk files
 - ** run
 module load devel/python/3.8.6_intel_19.1
