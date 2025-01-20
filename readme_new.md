@@ -21,7 +21,8 @@ module load devel/python/3.8.6_intel_19.1
   `/pfs/work7/workspace/scratch/ma_wezhu-ws_spreading2/jRDF2Vec/src/test/java/de/uni_mannheim/informatik/dws/jrdf2vec/util/TestWalkGenerationWithWeights.java`
 mvn -Dtest=TestWalkGenerationWithWeights test
 ### 2. Embedding Generation Command
-- **Command to Generate Embeddings from Walk Files:**  
+- **Command to Generate Embeddings from Walk Files:**
+- File : ['EmbeddingGenerator'](src/main/java/de/uni_mannheim/informatik/dws/jrdf2vec/util/EmbeddingGenerator.java)
    mvn exec:java -Dexec.mainClass="de.uni_mannheim.informatik.dws.jrdf2vec.util.EmbeddingGenerator"
 
 For perparing the file, please check : https://github.com/Weiweihere/Spreading-activation_rdf2vec, to generate the weight file and subgraph for your interesting node.
